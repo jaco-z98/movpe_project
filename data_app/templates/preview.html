@@ -1,0 +1,107 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Podgląd danych procesowych</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+            table-layout: auto;
+        }
+        th, td {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            text-align: center;
+            cursor: pointer;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        td:hover {
+            background-color: #e8f0fe;
+        }
+        #chart-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Podgląd danych – tabela i wykres</h1>
+
+    {% if error %}
+        <p style="color:red;">{{ error }}</p>
+    {% else %}
+        <div>
+            {{ table|safe }}
+        </div>
+
+        <div id="chart-container">
+            <h2>Wartość względem czasu</h2>
+            <div id="selected-point-chart" style="height: 400px;"></div>
+        </div>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const data = JSON.parse('{{ data_json|escapejs }}');
+                const table = document.getElementById("csv-data");
+
+                if (!table) {
+                    console.error("Brak tabeli CSV");
+                    return;
+                }
+
+                table.addEventListener("click", function (e) {
+                    const cell = e.target.closest("td");
+                    const row = cell?.parentElement;
+                    if (!cell || !row) return;
+
+                    const colIndex = cell.cellIndex;
+                    const rowIndex = row.rowIndex - 1;  // Pomijamy nagłówek
+                    if (rowIndex < 0 || colIndex <= 0) return;
+
+                    const columnName = table.rows[0].cells[colIndex].textContent;
+                    const xValues = data.map(row => row[Object.keys(row)[0]]);
+                    const yValues = data.map(row => parseFloat(row[columnName]));
+
+                    if (yValues.some(val => isNaN(val))) {
+                        alert("W tej kolumnie nie ma wartości numerycznych.");
+                        return;
+                    }
+
+                    Plotly.newPlot("selected-point-chart", [{
+                        x: xValues,
+                        y: yValues,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { color: 'blue' }
+                    }], {
+                        title: {
+                            text: `Wykres parametru "${columnName}" względem czasu`
+                        },
+                        xaxis: {
+                            title: "Czas (s)",
+                            tickformat: ".0f"
+                        },
+                        yaxis: {
+                            title: columnName
+                        }
+                    });
+                });
+            });
+        </script>
+    {% endif %}
+</body>
+</html>
