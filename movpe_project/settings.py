@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-7)pwcq=xzu@$6_w7z$w$7awd13k#f$y$5$)vw!3cqe0(&iei$p
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -80,9 +80,15 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+    },
+    'raw_measurements': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'raw_measurements.sqlite3',
     }
 }
 
+# Database routers
+DATABASE_ROUTERS = ['movpe_project.routers.RawMeasurementRouter']
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

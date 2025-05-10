@@ -40,3 +40,23 @@ class ProcessMeasurement(models.Model):
 
     def __str__(self):
         return f"{self.parameter_name} – avg: {self.average_value:.2f} (plik {self.data_file.id})"
+
+
+class RawMeasurement(models.Model):
+    data_file = models.ForeignKey(DataFile, on_delete=models.CASCADE, related_name='raw_measurements')
+    timestamp = models.DateTimeField()
+    heater_temp = models.FloatField(null=True, blank=True)
+    epi_reflect1_1 = models.FloatField(null=True, blank=True)
+    epi_reflect1_2 = models.FloatField(null=True, blank=True)
+    epi_reflect1_3 = models.FloatField(null=True, blank=True)
+    tmga_1_run = models.FloatField(null=True, blank=True)
+    tmal_1_run = models.FloatField(null=True, blank=True)
+    nh3_1_run = models.FloatField(null=True, blank=True)
+    sih4_1_run = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"Measurement at {self.timestamp}"

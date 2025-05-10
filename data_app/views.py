@@ -3,7 +3,7 @@ import numpy as np
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .forms import DataFileForm
-from .models import DataFile, MeasurementResult, ProcessMeasurement
+from .models import DataFile, MeasurementResult, ProcessMeasurement, RawMeasurement
 import plotly.graph_objs as go
 from plotly.offline import plot
 from scipy.interpolate import UnivariateSpline
@@ -78,7 +78,60 @@ def calculate_parameters(datafile):
     except Exception as e:
         print(f"Błąd podczas obliczania parametrów: {e}")
 
+def load_raw_data(datafile):
+    try:
+        df = pd.read_csv(datafile.file.path, sep=';')
+        # Convert time column to datetime
+        df.iloc[:, 0] = pd.to_datetime("2000-01-01 " + df.iloc[:, 0], errors='coerce')
+        df = df.dropna(subset=[df.columns[0]])
+
+        # Map column names to model fields
+        column_mapping = {
+            'Time (abs)': 'timestamp',
+            'Heater.temp.Current Value': 'heater_temp',
+            'EpiReflect1_1.Current Value': 'epi_reflect1_1',
+            'EpiReflect1_2.Current Value': 'epi_reflect1_2',
+            'EpiReflect1_3.Current Value': 'epi_reflect1_3',
+            'TMGa_1.run.Current Value': 'tmga_1_run',
+            'TMAl_1.run.Current Value': 'tmal_1_run',
+            'NH3_1.run.Current Value': 'nh3_1_run',
+            'SiH4_1.run.Current Value': 'sih4_1_run'
+        }
+
+        # Rename columns to match model fields
+        df = df.rename(columns=column_mapping)
+
+        # Convert all numeric columns to float
+        for col in df.columns:
+            if col != 'timestamp':
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        # Create RawMeasurement objects in bulk
+        measurements = []
+        for _, row in df.iterrows():
+            measurement = RawMeasurement(
+                data_file=datafile,
+                timestamp=row['timestamp'],
+                heater_temp=row.get('heater_temp'),
+                epi_reflect1_1=row.get('epi_reflect1_1'),
+                epi_reflect1_2=row.get('epi_reflect1_2'),
+                epi_reflect1_3=row.get('epi_reflect1_3'),
+                tmga_1_run=row.get('tmga_1_run'),
+                tmal_1_run=row.get('tmal_1_run'),
+                nh3_1_run=row.get('nh3_1_run'),
+                sih4_1_run=row.get('sih4_1_run')
+            )
+            measurements.append(measurement)
+
+        # Bulk create measurements
+        RawMeasurement.objects.bulk_create(measurements)
+        return True
+    except Exception as e:
+        print(f"Error loading raw data: {e}")
+        return False
+
 def index(request):
+    print(">>>>>>>>index")
     chart_2d = None
     chart_3d = None
     x_slider_max = 0
@@ -91,6 +144,9 @@ def index(request):
         form = DataFileForm(request.POST, request.FILES)
         if form.is_valid():
             file_instance = form.save()
+            # Load raw data first
+            load_raw_data(file_instance)
+            # Then calculate parameters
             calculate_parameters(file_instance)
             return redirect('index')
     else:
@@ -98,6 +154,7 @@ def index(request):
 
     last_file = DataFile.objects.last()
     if last_file:
+        print(">>>>>>>>index read_csv")
         df = pd.read_csv(last_file.file.path, sep=';')
         df[df.columns[0]] = pd.to_datetime("2000-01-01 " + df[df.columns[0]], errors='coerce')
         df = df.dropna(subset=[df.columns[0]])
