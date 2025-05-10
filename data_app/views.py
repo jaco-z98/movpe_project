@@ -110,7 +110,7 @@ def load_raw_data(datafile):
         measurements = []
         for _, row in df.iterrows():
             measurement = RawMeasurement(
-                data_file=datafile,
+                data_file_id=datafile.id,
                 timestamp=row['timestamp'],
                 heater_temp=row.get('heater_temp'),
                 epi_reflect1_1=row.get('epi_reflect1_1'),
@@ -123,8 +123,8 @@ def load_raw_data(datafile):
             )
             measurements.append(measurement)
 
-        # Bulk create measurements
-        RawMeasurement.objects.bulk_create(measurements)
+        # Bulk create measurements using the raw_measurements database
+        RawMeasurement.objects.using('raw_measurements').bulk_create(measurements)
         return True
     except Exception as e:
         print(f"Error loading raw data: {e}")

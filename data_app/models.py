@@ -43,7 +43,7 @@ class ProcessMeasurement(models.Model):
 
 
 class RawMeasurement(models.Model):
-    data_file = models.ForeignKey(DataFile, on_delete=models.CASCADE, related_name='raw_measurements')
+    data_file_id = models.IntegerField(null=True, blank=True)  # Make it nullable initially
     timestamp = models.DateTimeField()
     heater_temp = models.FloatField(null=True, blank=True)
     epi_reflect1_1 = models.FloatField(null=True, blank=True)
@@ -60,3 +60,9 @@ class RawMeasurement(models.Model):
 
     def __str__(self):
         return f"Measurement at {self.timestamp}"
+
+    @property
+    def data_file(self):
+        """Get the related DataFile from the default database"""
+        from .models import DataFile
+        return DataFile.objects.get(id=self.data_file_id)
