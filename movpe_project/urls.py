@@ -1,7 +1,9 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+from .proxy import proxy_view
 
 urlpatterns = [
-    path('', include('data_app.urls')),
     path('admin/', admin.site.urls),
+    path('app/', include('data_app.urls')),
+    re_path(r'^data/(?P<path>.*)$', proxy_view),
 ]
