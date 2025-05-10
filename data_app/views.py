@@ -3,7 +3,8 @@ import numpy as np
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .forms import DataFileForm
-from .models import DataFile, MeasurementResult, ProcessMeasurement, RawMeasurement
+from .models import DataFile, MeasurementResult, ProcessMeasurement
+from raw_data.models import RawMeasurement
 import plotly.graph_objs as go
 from plotly.offline import plot
 from scipy.interpolate import UnivariateSpline
