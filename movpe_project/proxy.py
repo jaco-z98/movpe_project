@@ -1,5 +1,5 @@
 import requests
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.conf import settings
 import re
 from urllib.parse import urljoin
@@ -16,7 +16,11 @@ def proxy_view(request, path=''):
     # Remove the 'data/' prefix from the path
     if path.startswith('data/'):
         path = path[5:]
-    
+
+    # Block access to any path that doesn't start with 'raw_data_rawmeasurement/' or 'static/'
+    if not path.startswith('raw_data_rawmeasurement/') and not path.startswith('static/'):
+        return HttpResponseForbidden()
+
     # Construct the target URL
     target_url = f'http://127.0.0.1:8085/{path}'
     print("target_url:", target_url)
