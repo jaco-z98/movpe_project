@@ -4,12 +4,13 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from .forms import DataFileForm
 from .models import DataFile, MeasurementResult, ProcessMeasurement
-from raw_data.models import RawMeasurement
+from raw_data.models import RawMeasurement, RawMeasurement2
 import plotly.graph_objs as go
 from plotly.offline import plot
 from scipy.interpolate import UnivariateSpline
 import warnings
 import os
+from django.utils import timezone
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -79,56 +80,93 @@ def calculate_parameters(datafile):
     except Exception as e:
         print(f"Błąd podczas obliczania parametrów: {e}")
 
-def load_raw_data(datafile):
+def load_raw_data(file_path, data_file_id):
+    """Load raw data from CSV file into the database"""
     try:
-        df = pd.read_csv(datafile.file.path, sep=';')
-        # Convert time column to datetime
-        df.iloc[:, 0] = pd.to_datetime("2000-01-01 " + df.iloc[:, 0], errors='coerce')
-        df = df.dropna(subset=[df.columns[0]])
+        # Read the first few lines to determine the format
+        with open(file_path, 'r') as f:
+            first_line = f.readline().strip()
+            second_line = f.readline().strip()
+        
+        print("First line:", first_line)
+        print("Second line:", second_line)
+        
+        # Check if this is the first format (with Heater.temp.Current Value)
+        is_first_format = 'Heater.temp.Current Value' in first_line
+        
+        df = pd.read_csv(file_path, sep=';')
 
-        # Map column names to model fields
-        column_mapping = {
-            'Time (abs)': 'timestamp',
-            'Heater.temp.Current Value': 'heater_temp',
-            'EpiReflect1_1.Current Value': 'epi_reflect1_1',
-            'EpiReflect1_2.Current Value': 'epi_reflect1_2',
-            'EpiReflect1_3.Current Value': 'epi_reflect1_3',
-            'TMGa_1.run.Current Value': 'tmga_1_run',
-            'TMAl_1.run.Current Value': 'tmal_1_run',
-            'NH3_1.run.Current Value': 'nh3_1_run',
-            'SiH4_1.run.Current Value': 'sih4_1_run'
-        }
-
-        # Rename columns to match model fields
-        df = df.rename(columns=column_mapping)
-
-        # Convert all numeric columns to float
-        for col in df.columns:
-            if col != 'timestamp':
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-
-        # Create RawMeasurement objects in bulk
         measurements = []
-        for _, row in df.iterrows():
-            measurement = RawMeasurement(
-                data_file_id=datafile.id,
-                timestamp=row['timestamp'],
-                heater_temp=row.get('heater_temp'),
-                epi_reflect1_1=row.get('epi_reflect1_1'),
-                epi_reflect1_2=row.get('epi_reflect1_2'),
-                epi_reflect1_3=row.get('epi_reflect1_3'),
-                tmga_1_run=row.get('tmga_1_run'),
-                tmal_1_run=row.get('tmal_1_run'),
-                nh3_1_run=row.get('nh3_1_run'),
-                sih4_1_run=row.get('sih4_1_run')
-            )
-            measurements.append(measurement)
 
-        # Bulk create measurements using the raw_measurements database
-        RawMeasurement.objects.using('raw_measurements').bulk_create(measurements)
+        if is_first_format:
+            df.iloc[:, 0] = pd.to_datetime("2000-01-01 " + df.iloc[:, 0], errors='coerce')
+            df = df.dropna(subset=[df.columns[0]])
+            column_mapping = {
+                'Time (abs)': 'timestamp',
+                'Heater.temp.Current Value': 'heater_temp',
+                'EpiReflect1_1.Current Value': 'epi_reflect1_1',
+                'EpiReflect1_2.Current Value': 'epi_reflect1_2',
+                'EpiReflect1_3.Current Value': 'epi_reflect1_3',
+                'TMGa_1.run.Current Value': 'tmga_1_run',
+                'TMAl_1.run.Current Value': 'tmal_1_run',
+                'NH3_1.run.Current Value': 'nh3_1_run',
+                'SiH4_1.run.Current Value': 'sih4_1_run'
+            }
+
+            # Rename columns to match model fields
+            df = df.rename(columns=column_mapping)
+
+            # Convert all numeric columns to float
+            for col in df.columns:
+                if col != 'timestamp':
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            # Create RawMeasurement objects in bulk
+            measurements = []
+            for _, row in df.iterrows():
+                measurement = RawMeasurement(
+                    data_file_id=data_file_id,
+                    timestamp=row['timestamp'],
+                    heater_temp=row.get('heater_temp'),
+                    epi_reflect1_1=row.get('epi_reflect1_1'),
+                    epi_reflect1_2=row.get('epi_reflect1_2'),
+                    epi_reflect1_3=row.get('epi_reflect1_3'),
+                    tmga_1_run=row.get('tmga_1_run'),
+                    tmal_1_run=row.get('tmal_1_run'),
+                    nh3_1_run=row.get('nh3_1_run'),
+                    sih4_1_run=row.get('sih4_1_run')
+                )
+                measurements.append(measurement)
+            RawMeasurement.objects.using('raw_measurements').bulk_create(measurements)
+        else:
+            # Second format - process angle-based data
+            print("\nSecond format columns:")
+            print(df.columns.tolist())
+            
+            # Convert Time / Angle column to datetime
+            df['Time / Angle'] = pd.to_datetime(df['Time / Angle'])
+            
+            print("Time column:", df['Time / Angle'].head())
+            
+            for _, row in df.iterrows():
+                measurement = RawMeasurement2.objects.create(
+                    data_file_id=data_file_id,
+                    timestamp=row['Time / Angle']
+                )
+                
+                # Set intensity values for each angle
+                for angle in range(0, 360, 2):
+                    column_name = str(angle)
+                    if column_name in row:
+                        setattr(measurement, f'intensity_{angle}', row[column_name])
+                
+                measurements.append(measurement)
+            
+            RawMeasurement.objects.using('raw_measurements_2').bulk_create(measurements)
+
         return True
     except Exception as e:
-        print(f"Error loading raw data: {e}")
+        print(f"Error loading raw data: {str(e)}")
         return False
 
 def index(request):
@@ -146,7 +184,7 @@ def index(request):
         if form.is_valid():
             file_instance = form.save()
             # Load raw data first
-            load_raw_data(file_instance)
+            load_raw_data(file_instance.file.path, file_instance.id)
             # Then calculate parameters
             calculate_parameters(file_instance)
             return redirect('index')
