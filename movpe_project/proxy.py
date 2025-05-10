@@ -2,17 +2,24 @@ import requests
 from django.http import HttpResponse
 from django.conf import settings
 import re
+from urllib.parse import urljoin
 
 def proxy_view(request, path=''):
     """
     Proxy view that forwards requests to sqlite-web
     """
+    print(">>>> proxy_view req:", request)
+    print(">>>> proxy_view path:", path)
+    print(">>>> proxy_view method:", request.method)
+    print(">>>> proxy_view headers:", dict(request.headers))
+    
     # Remove the 'data/' prefix from the path
     if path.startswith('data/'):
         path = path[5:]
     
     # Construct the target URL
     target_url = f'http://127.0.0.1:8085/{path}'
+    print("target_url:", target_url)
     
     # List of hop-by-hop headers that should not be forwarded
     hop_by_hop_headers = {
@@ -26,6 +33,7 @@ def proxy_view(request, path=''):
         key: value for key, value in request.headers.items()
         if key.lower() not in hop_by_hop_headers
     }
+    print("forwarding headers:", headers)
     
     # Forward the request
     resp = requests.request(
@@ -34,8 +42,11 @@ def proxy_view(request, path=''):
         headers=headers,
         data=request.body,
         cookies=request.COOKIES,
-        allow_redirects=False,
+        allow_redirects=False,  # Don't follow redirects automatically
     )
+    
+    print("response status:", resp.status_code)
+    print("response headers:", dict(resp.headers))
     
     # Get the content type
     content_type = resp.headers.get('Content-Type', '')
@@ -72,9 +83,21 @@ def proxy_view(request, path=''):
             content_type=content_type
         )
     
-    # Copy headers, excluding hop-by-hop headers
-    for key, value in resp.headers.items():
-        if key.lower() not in hop_by_hop_headers:
-            response[key] = value
+    # # Copy headers, excluding hop-by-hop headers
+    # for key, value in resp.headers.items():
+    #     if key.lower() not in hop_by_hop_headers:
+    #         # If this is a Location header (redirect), rewrite the URL
+    #         if key.lower() == 'location':
+    #             print("Original location header:", value)
+    #             # If the location is relative, make it absolute first
+    #             if not value.startswith(('http://', 'https://')):
+    #                 value = urljoin(target_url, value)
+    #             # Then rewrite it to use our /data/ prefix
+    #             if value.startswith('http://127.0.0.1:8085/'):
+    #                 value = value.replace('http://127.0.0.1:8085/', '/data/')
+    #             elif value.startswith('/'):
+    #                 value = '/data' + value
+    #             print("Rewritten location header:", value)
+    #         response[key] = value
             
     return response 

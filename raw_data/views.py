@@ -28,7 +28,10 @@ def sqlite_web_proxy(request):
     # Capture sqlite-web output
     with CaptureOutput() as capture:
         # Get the path from the request
-        path = request.path.replace('/raw-data/db/', '')
+        path = request.path
+        # Remove /data/ prefix if it exists
+        if path.startswith('/data/'):
+            path = path[6:]  # Remove /data/
         
         # Create a mock environment for sqlite-web
         environ = {
@@ -45,7 +48,6 @@ def sqlite_web_proxy(request):
         for key, value in request.headers.items():
             environ[f'HTTP_{key.upper().replace("-", "_")}'] = value
 
-        # sqlite_web
         # Run sqlite-web
         sqlite_web.app.run(environ, lambda status, headers, exc_info=None: None)
 
