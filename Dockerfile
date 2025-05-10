@@ -11,7 +11,7 @@ RUN pip3 install requests
 
 RUN apt install dumb-init
 
-COPY ./ /app
+# COPY ./ /app
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/app/start.sh"]

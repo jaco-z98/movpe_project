@@ -2,7 +2,7 @@ import requests
 from django.http import HttpResponse, HttpResponseForbidden
 from django.conf import settings
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlencode
 
 def proxy_view(request, path=''):
     """
@@ -17,9 +17,14 @@ def proxy_view(request, path=''):
     if path.startswith('data/'):
         path = path[5:]
 
+    # Add query parameters to the path
+    if request.GET:
+        query_string = urlencode(request.GET)
+        path = f"{path}?{query_string}"
+
     # Block access to any path that doesn't start with 'raw_data_rawmeasurement/' or 'static/'
-    if not path.startswith('raw_data_rawmeasurement/') and not path.startswith('static/'):
-        return HttpResponseForbidden()
+    # if not path.startswith('raw_data_rawmeasurement/') and not path.startswith('raw_data_rawmeasurement/content/') and not path.startswith('static/'):
+    #     return HttpResponseForbidden()
 
     # Construct the target URL
     target_url = f'http://127.0.0.1:8085/{path}'
@@ -71,6 +76,13 @@ def proxy_view(request, path=''):
         content = re.sub(
             r'(action|href)="(/api/|/db/)',
             r'\1="/data\2',
+            content
+        )
+        
+        # Rewrite relative URLs that don't start with /data/
+        content = re.sub(
+            r'(href|action)="(?!http|https|/data|/static|/css|/js|/img)([^"]+)"',
+            r'\1="/data/\2"',
             content
         )
         
