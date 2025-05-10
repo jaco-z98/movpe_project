@@ -25,13 +25,12 @@ class CaptureOutput:
 
 @csrf_exempt
 def sqlite_web_proxy(request):
+    print(">>>>request: ", request)
+
     # Capture sqlite-web output
     with CaptureOutput() as capture:
         # Get the path from the request
         path = request.path
-        # Remove /data/ prefix if it exists
-        if path.startswith('/data/'):
-            path = path[6:]  # Remove /data/
         
         # Create a mock environment for sqlite-web
         environ = {
