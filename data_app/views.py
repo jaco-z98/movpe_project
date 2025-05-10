@@ -143,13 +143,15 @@ def load_raw_data(file_path, data_file_id):
             print("\nSecond format columns:")
             print(df.columns.tolist())
             
-            # Convert Time / Angle column to datetime
+            # Convert Time / Angle column to datetime and make it timezone-aware
             df['Time / Angle'] = pd.to_datetime(df['Time / Angle'])
+            df['Time / Angle'] = df['Time / Angle'].dt.tz_localize(timezone.get_current_timezone())
             
             print("Time column:", df['Time / Angle'].head())
             
+            measurements = []
             for _, row in df.iterrows():
-                measurement = RawMeasurement2.objects.create(
+                measurement = RawMeasurement2(
                     data_file_id=data_file_id,
                     timestamp=row['Time / Angle']
                 )
@@ -162,7 +164,7 @@ def load_raw_data(file_path, data_file_id):
                 
                 measurements.append(measurement)
             
-            RawMeasurement.objects.using('raw_measurements_2').bulk_create(measurements)
+            RawMeasurement2.objects.using('raw_measurements').bulk_create(measurements)
 
         return True
     except Exception as e:
